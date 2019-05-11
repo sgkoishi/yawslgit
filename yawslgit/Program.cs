@@ -106,7 +106,7 @@ namespace yawslgit
                 RedirectStandardInput = true
             };
             Log($"Invoke ({token}):\r\n\t{psi.Arguments}\r\n");
-            Console.Out.Write($"Git command: {psi.Arguments}\n");
+            Console.Error.Write($"Git command: {psi.Arguments}\n");
             var git = new Process() { StartInfo = psi };
             git.OutputDataReceived += (object sender, DataReceivedEventArgs e) =>
             {
