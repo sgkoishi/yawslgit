@@ -30,17 +30,17 @@ namespace yawslgit
 
         private static string ToLinuxPath(string path)
         {
-            if (char.IsLetter(path[0]) && path[1] == ':')
-            {
-                return $"/mnt/{char.ToLower(path[0])}{path.Substring(2)}".Replace("\\", "/");
-            }
-            return path;
+            return char.IsLetter(path[0]) && path[1] == ':' ? $"/mnt/{char.ToLower(path[0])}{path.Substring(2)}".Replace("\\", "/") : path;
+        }
+
+        private static string ToWindowsPath(string path)
+        {
+            throw new NotImplementedException();
         }
 
         private static string ToCommandLine(string[] args)
         {
             var result = new List<string>();
-            var needQuote = false;
             foreach (var item in args)
             {
                 var backslashes = new List<string>();
@@ -48,7 +48,7 @@ namespace yawslgit
                 {
                     result.Add(" ");
                 }
-                needQuote = item.Contains(" ") || item.Contains("\t") || string.IsNullOrWhiteSpace(item);
+                var needQuote = item.Contains(" ") || item.Contains("\t") || string.IsNullOrWhiteSpace(item);
                 if (needQuote)
                 {
                     result.Add("\"");
