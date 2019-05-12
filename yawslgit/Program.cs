@@ -110,7 +110,7 @@ namespace yawslgit
             var git = new Process() { StartInfo = psi };
             git.OutputDataReceived += (object sender, DataReceivedEventArgs e) =>
             {
-                var str = e?.Data?.TrimEnd('\0');
+                var str = e?.Data; // ?.TrimEnd('\0');
                 if (!string.IsNullOrEmpty(str))
                 {
                     Log($"Output ({token}):\r\n\t{str}\r\n");
@@ -119,7 +119,7 @@ namespace yawslgit
             };
             git.ErrorDataReceived += (object sender, DataReceivedEventArgs e) =>
             {
-                var str = e?.Data?.TrimEnd('\0');
+                var str = e?.Data; // ?.TrimEnd('\0');
                 if (!string.IsNullOrEmpty(str))
                 {
                     Log($"Error ({token}):\r\n\t{str}\r\n");
