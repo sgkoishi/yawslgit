@@ -1,6 +1,4 @@
 ﻿using System;
-using System.CodeDom;
-using System.CodeDom.Compiler;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -17,16 +15,8 @@ namespace yawslgit
 
         [DllImport("user32.dll")]
         private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-        private static readonly object _writeLock = new object();
 
-        [Conditional("DEBUG")]
-        private static void Log(string str)
-        {
-            lock (_writeLock)
-            {
-                File.AppendAllText("C:\\Arch\\yawslgit.log", str);
-            }
-        }
+        private static readonly object _writeLock = new object();
 
         private static string ToLinuxPath(string path)
         {
@@ -43,7 +33,7 @@ namespace yawslgit
             var result = new List<string>();
             foreach (var item in args)
             {
-                var backslashes = new List<string>();
+                var backslashes = 0;
                 if (result.Count > 0)
                 {
                     result.Add(" ");
@@ -59,22 +49,22 @@ namespace yawslgit
                     {
                         case '\\':
                         {
-                            backslashes.Add("\\");
+                            backslashes++;
                             break;
                         }
                         case '"':
                         {
-                            result.Add(new string('\\', backslashes.Count * 2));
+                            result.Add(new string('\\', backslashes * 2));
                             result.Add("\\\"");
-                            backslashes = new List<string>();
+                            backslashes = 0;
                             break;
                         }
                         default:
                         {
-                            if (backslashes.Count > 0)
+                            if (backslashes > 0)
                             {
-                                result.AddRange(backslashes);
-                                backslashes = new List<string>();
+                                result.Add(new string('\\', backslashes));
+                                backslashes = 0;
                             }
                             result.Add(c.ToString());
                             break;
@@ -83,16 +73,40 @@ namespace yawslgit
                 }
                 if (needQuote)
                 {
-                    result.AddRange(backslashes);
+                    result.Add(new string('\\', backslashes));
                     result.Add("\"");
                 }
             }
             return string.Concat(result);
         }
 
+        [Conditional("DEBUG")]
+        private static void Log(string str)
+        {
+            lock (_writeLock)
+            {
+                if (File.Exists("C:\\Arch\\yawslgit.log"))
+                {
+                    File.AppendAllText("C:\\Arch\\yawslgit.log", str);
+                }
+            }
+        }
+
         private static void Main(string[] args)
         {
             var argsOnly = ToCommandLine(args.Select(ToLinuxPath).ToArray());
+            if (argsOnly == "diff-index --raw HEAD --numstat -C50% -M50% -z --")
+            {
+                // TortoiseGit workaround
+                // See https://gitlab.com/tortoisegit/tortoisegit/issues/3380
+                // Run "git status" will fix this problem - but why?
+                Process.Start(new ProcessStartInfo(@"C:\Windows\Sysnative\wsl.exe")
+                {
+                    UseShellExecute = false,
+                    Arguments = "git status",
+                    CreateNoWindow = true
+                }).WaitForExit();
+            }
             var token = new Random().Next();
             Log($"CL ({token}):\r\n\t{Environment.CommandLine}\r\n");
             Log($"Args ({token}):\r\n\t{string.Join("\r\n\t", args)}\r\n");
@@ -133,6 +147,7 @@ namespace yawslgit
             {
                 while (true)
                 {
+                    // There's no interact with TortoiseGit, so it's probably not gonna be used
                     git.StandardInput.Write((char) Console.In.Read());
                 }
             }).Start();
