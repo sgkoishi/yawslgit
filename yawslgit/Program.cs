@@ -102,18 +102,6 @@ namespace yawslgit
             return string.Concat(result);
         }
 
-        [Conditional("DEBUG")]
-        private static void Log(string str)
-        {
-            lock (_writeLock)
-            {
-                if (File.Exists("C:\\Arch\\yawslgit.log"))
-                {
-                    File.AppendAllText("C:\\Arch\\yawslgit.log", str);
-                }
-            }
-        }
-
         /// <summary>
         /// A helper function to execute command in WSL.
         /// </summary>
@@ -139,35 +127,14 @@ namespace yawslgit
             {
                 // TortoiseGit workaround
                 // See https://gitlab.com/tortoisegit/tortoisegit/issues/3380
-                // Run "git status" will fix this problem - but why?
+                // Run "git status" will fix this problem
                 Process.Start(Start("git status")).WaitForExit();
             }
-            var token = new Random().Next();
-            Log($"CL ({token}):\r\n\t{Environment.CommandLine}\r\n");
-            Log($"Args ({token}):\r\n\t{string.Join("\r\n\t", args)}\r\n");
-            var psi = Start("git " + argsOnly);
-            Log($"Invoke ({token}):\r\n\t{psi.Arguments}\r\n");
-            var git = new Process() { StartInfo = psi };
-            //git.OutputDataReceived += (object sender, DataReceivedEventArgs e) =>
-            //{
-            //    var str = e?.Data; // ?.TrimEnd('\0');
-            //    if (!string.IsNullOrEmpty(str))
-            //    {
-            //        str = ToWindowsPath(str);
-            //        Log($"Output ({token}):\r\n\t{str}\r\n");
-            //        Console.Out.Write(str + "\n");
-            //    }
-            //};
-            //git.ErrorDataReceived += (object sender, DataReceivedEventArgs e) =>
-            //{
-            //    var str = e?.Data; // ?.TrimEnd('\0');
-            //    if (!string.IsNullOrEmpty(str))
-            //    {
-            //        str = ToWindowsPath(str);
-            //        Log($"Error ({token}):\r\n\t{str}\r\n");
-            //        Console.Error.WriteLine(str + "\n");
-            //    }
-            //};
+            var git = new Process()
+            {
+                StartInfo = Start("git " + argsOnly)
+            };
+
             var outputBuffer = new byte[1];
             var outputStream = Console.OpenStandardOutput();
             var outputEOS = false;
@@ -187,6 +154,7 @@ namespace yawslgit
                 }
                 ReadNextOutput();
             });
+
             var errorBuffer = new byte[1];
             var errorStream = Console.OpenStandardError();
             var errorEOS = false;
@@ -206,13 +174,30 @@ namespace yawslgit
                 }
                 ReadNextError();
             });
+
             git.Start();
             ReadNextOutput();
             ReadNextError();
-            //git.BeginOutputReadLine();
-            //git.BeginErrorReadLine();
+
             git.WaitForExit();
-            Environment.Exit(git.ExitCode);
+
+            while (true)
+            {
+                // while (!errorEOS && !outputEOS) doesn't work, I had to separate them
+                // ¯\_(ツ)_/¯
+                if (!errorEOS)
+                {
+                    Thread.Sleep(1);
+                }
+                else if (!outputEOS)
+                {
+                    Thread.Sleep(1);
+                }
+                else
+                {
+                    Environment.Exit(git.ExitCode);
+                }
+            }
         }
     }
 }
