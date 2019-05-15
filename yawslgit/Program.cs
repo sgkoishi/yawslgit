@@ -4,19 +4,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Threading;
 
 namespace yawslgit
 {
     internal static class Program
     {
-        [DllImport("kernel32.dll")]
-        private static extern IntPtr GetConsoleWindow();
-
-        [DllImport("user32.dll")]
-        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
         private static readonly object _writeLock = new object();
         private static readonly RegistryKey lxss = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Lxss");
         public static readonly string SystemDrive = Path.GetPathRoot(Environment.SystemDirectory);
@@ -155,37 +147,47 @@ namespace yawslgit
             var psi = Start("git " + argsOnly);
             Log($"Invoke ({token}):\r\n\t{psi.Arguments}\r\n");
             var git = new Process() { StartInfo = psi };
-            git.OutputDataReceived += (object sender, DataReceivedEventArgs e) =>
+            //git.OutputDataReceived += (object sender, DataReceivedEventArgs e) =>
+            //{
+            //    var str = e?.Data; // ?.TrimEnd('\0');
+            //    if (!string.IsNullOrEmpty(str))
+            //    {
+            //        str = ToWindowsPath(str);
+            //        Log($"Output ({token}):\r\n\t{str}\r\n");
+            //        Console.Out.Write(str + "\n");
+            //    }
+            //};
+            //git.ErrorDataReceived += (object sender, DataReceivedEventArgs e) =>
+            //{
+            //    var str = e?.Data; // ?.TrimEnd('\0');
+            //    if (!string.IsNullOrEmpty(str))
+            //    {
+            //        str = ToWindowsPath(str);
+            //        Log($"Error ({token}):\r\n\t{str}\r\n");
+            //        Console.Error.WriteLine(str + "\n");
+            //    }
+            //};
+            var outputBuffer = new byte[1];
+            var outputStream = Console.OpenStandardOutput();
+            void ReadNextOutput() => git.StandardOutput.BaseStream.BeginRead(outputBuffer, 0, 1, (ar) =>
             {
-                var str = e?.Data; // ?.TrimEnd('\0');
-                if (!string.IsNullOrEmpty(str))
-                {
-                    str = ToWindowsPath(str);
-                    Log($"Output ({token}):\r\n\t{str}\r\n");
-                    Console.Out.Write(str + "\n");
-                }
-            };
-            git.ErrorDataReceived += (object sender, DataReceivedEventArgs e) =>
+                git.StandardOutput.BaseStream.EndRead(ar);
+                outputStream.Write(outputBuffer, 0, 1);
+                ReadNextOutput();
+            }, null);
+            var errorBuffer = new byte[1];
+            var errorStream = Console.OpenStandardError();
+            void ReadNextError() => git.StandardError.BaseStream.BeginRead(errorBuffer, 0, 1, (ar) =>
             {
-                var str = e?.Data; // ?.TrimEnd('\0');
-                if (!string.IsNullOrEmpty(str))
-                {
-                    str = ToWindowsPath(str);
-                    Log($"Error ({token}):\r\n\t{str}\r\n");
-                    Console.Error.WriteLine(str + "\n");
-                }
-            };
+                git.StandardError.BaseStream.EndRead(ar);
+                errorStream.Write(errorBuffer, 0, 1);
+                ReadNextError();
+            }, null);
             git.Start();
-            git.BeginOutputReadLine();
-            git.BeginErrorReadLine();
-            new Thread(() =>
-            {
-                while (true)
-                {
-                    // There's no interact with TortoiseGit, so it's probably not gonna be used
-                    git.StandardInput.Write((char) Console.In.Read());
-                }
-            }).Start();
+            ReadNextOutput();
+            ReadNextError();
+            //git.BeginOutputReadLine();
+            //git.BeginErrorReadLine();
             git.WaitForExit();
             Environment.Exit(git.ExitCode);
         }
