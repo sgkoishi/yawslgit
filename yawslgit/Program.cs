@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
 
 namespace yawslgit
 {
@@ -169,20 +170,42 @@ namespace yawslgit
             //};
             var outputBuffer = new byte[1];
             var outputStream = Console.OpenStandardOutput();
-            void ReadNextOutput() => git.StandardOutput.BaseStream.BeginRead(outputBuffer, 0, 1, (ar) =>
+            var outputEOS = false;
+            void ReadNextOutput() => git.StandardOutput.BaseStream.ReadAsync(outputBuffer, 0, 1).ContinueWith(i =>
             {
-                git.StandardOutput.BaseStream.EndRead(ar);
-                outputStream.Write(outputBuffer, 0, 1);
+                if (i.Result > 0)
+                {
+                    outputStream.Write(outputBuffer, 0, 1);
+                    outputEOS = false;
+                }
+                else
+                {
+                    if (git.StandardOutput.EndOfStream)
+                    {
+                        outputEOS = true;
+                    }
+                }
                 ReadNextOutput();
-            }, null);
+            });
             var errorBuffer = new byte[1];
             var errorStream = Console.OpenStandardError();
-            void ReadNextError() => git.StandardError.BaseStream.BeginRead(errorBuffer, 0, 1, (ar) =>
+            var errorEOS = false;
+            void ReadNextError() => git.StandardError.BaseStream.ReadAsync(errorBuffer, 0, 1).ContinueWith(i =>
             {
-                git.StandardError.BaseStream.EndRead(ar);
-                errorStream.Write(errorBuffer, 0, 1);
+                if (i.Result > 0)
+                {
+                    errorStream.Write(errorBuffer, 0, 1);
+                    errorEOS = false;
+                }
+                else
+                {
+                    if (git.StandardError.EndOfStream)
+                    {
+                        errorEOS = true;
+                    }
+                }
                 ReadNextError();
-            }, null);
+            });
             git.Start();
             ReadNextOutput();
             ReadNextError();
